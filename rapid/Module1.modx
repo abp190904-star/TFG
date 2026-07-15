@@ -1,0 +1,234 @@
+MODULE Module1
+    VAR egmident egmID1;
+
+    ! Matrices de 100 posiciones con NOMBRES NUEVOS para forzar memoria limpia
+    PERS dnum EntradaRubik{40};
+    PERS dnum SalidaRubik{40} := [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];      
+    ! ==========================================================
+    ! RUTINA TEMPORAL DE TEST PING-PONG EGM
+    ! ==========================================================
+    PROC main_Prueba_Comunicacion()
+        VAR egmident egmID_Test;
+        
+        TPWrite "Iniciando Test de Conexion EGM...";
+        
+        ! Limpiamos variables
+        SalidaRubik{1} := NumToDnum(0);
+        EntradaRubik{1} := NumToDnum(0);
+
+        ! Arrancamos el canal EGM
+        EGMGetId egmID_Test;
+        EGMSetupUC ROB_1, egmID_Test, "default", "UCdevice" \Pose;
+        EGMActPose egmID_Test \StreamStart \Tool:=tool0 \WObj:=wobj0 \DataToSensor:=SalidaRubik \DataFromSensor:=EntradaRubik, pose0, EGM_FRAME_WOBJ, pose0, EGM_FRAME_WOBJ;
+
+        TPWrite "EGM Abierto. Enviando pings a Python...";
+
+        WHILE TRUE DO
+            ! Le enviamos un 777 a Python
+            SalidaRubik{1} := NumToDnum(777);
+            
+            ! Imprimimos lo que Python nos devuelve
+            TPWrite "Enviado: 777 | Recibido de Python: " + NumToStr(DnumToNum(EntradaRubik{1}), 0);
+            
+            WaitTime 1.0; ! Repetimos cada segundo
+        ENDWHILE
+    ENDPROC
+    
+    
+    ! -----------------------------------------------------------------
+    ! MAIN DE PRUEBAS (Física y Lógica local sin Python)
+    ! -----------------------------------------------------------------
+    PROC main_pruebas()
+        ! --- Dar libertad a las articulaciones ---
+        !ConfL \Off;
+        !ConfJ \Off;
+        !SingArea \Wrist; ! Esto ayuda a evitar el bloqueo en el eje 5
+        
+        Reset do_Gripper_Close;
+        Reset do_Gripper_Open;
+        
+        TPWrite "=== INICIANDO TEST UNITARIO DE CARAS ===";
+        ! Usamos las nuevas constantes de velocidad y zona
+        MoveJ pHome, vGiro, zLibre, PincGripper \WObj:=wobj_Cubo;
+        
+        Rutina_Escanear_Cubo;
+        
+        ! Descomenta SOLO la cara que quieras probar en este momento
+        
+        !TPWrite "Probando F (Front)...";
+        !Girar_F;
+        !WaitTime 2.0; ! Pausa para observar
+        
+        !TPWrite "Probando B (Back)...";
+        !Girar_B;
+        !WaitTime 2.0;
+        
+        !TPWrite "Probando D (Down - Doble F)...";
+        !Girar_D;
+        !WaitTime 2.0;
+        
+        !TPWrite "Probando R (Down - Doble F)...";
+        !Girar_R;
+        !WaitTime 2.0;
+        
+        !TPWrite "Probando F Doble (F2)...";
+        !Girar_F_Doble;    ! <--- Simplemente pones el nombre de la rutina aquí
+        !WaitTime 2.0;     ! Pausa para observar que lo ha hecho bien
+        
+        !TPWrite "Probando R Doble (R2)...";
+        !Girar_R_Doble;   ! <--- Si quieres probar otra, la pones y la descomentas
+        !WaitTime 2.0;
+        
+        TPWrite "=== TEST FINALIZADO ===";
+        MoveJ pHome, vGiro, zLibre, PincGripper \WObj:=wobj_Cubo;
+        Stop;
+    ENDPROC
+
+    ! -----------------------------------------------------------------
+    ! MAIN DE PRODUCCIÓN (Conexión Python - EGM)
+    ! -----------------------------------------------------------------
+    
+   PROC main()
+        VAR num cmd;
+        VAR num id_recibido;
+        VAR num id_procesado := 0;
+        VAR bool bResolviendo := FALSE; 
+        
+        Reset do_Gripper_Close;
+        Reset do_Gripper_Open;
+        
+        t_anim := 0.15;  
+        TPWrite "=== SISTEMA OK: ESPERANDO PYTHON ===";
+
+        FOR i FROM 1 TO 40 DO
+            EntradaRubik{i} := 0;
+            SalidaRubik{i} := 0;
+        ENDFOR
+        
+        WaitTime 1.0;
+
+        EGMGetId egmID1;
+        EGMSetupUC ROB_1, egmID1, "default", "UCdevice" \Pose;
+        EGMActPose egmID1 \StreamStart \Tool:=tool0 \WObj:=wobj0 \DataToSensor:=SalidaRubik \DataFromSensor:=EntradaRubik, pose0, EGM_FRAME_WOBJ, pose0, EGM_FRAME_WOBJ;
+
+        TPWrite "Conectado. Esperando MEZCLADO...";
+        
+        ! FASE 1: BUCLE DE MEZCLADO
+        WHILE TRUE DO
+            WaitUntil DnumToNum(EntradaRubik{1}) > id_procesado \PollRate:=0.01;
+            id_recibido := DnumToNum(EntradaRubik{1});
+            cmd := DnumToNum(EntradaRubik{2});
+
+            IF cmd = 998 GOTO Abortar;
+            
+            IF cmd = 98 THEN
+                TPWrite "Mezclado terminado. Iniciando escaneo...";
+                id_procesado := id_recibido;
+                SalidaRubik{1} := NumToDnum(id_procesado);
+                WaitTime 0.1;
+                GOTO FinMezclado;
+            ENDIF
+
+            TEST cmd
+                CASE 1: PulseDO \High \PLength:=0.1, DO_Girar_U;
+                CASE 2: PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
+                CASE 3: PulseDO \High \PLength:=0.1, DO_Girar_F;
+                CASE 4: PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
+                CASE 5: PulseDO \High \PLength:=0.1, DO_Girar_D;
+                CASE 6: PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
+                CASE 7: PulseDO \High \PLength:=0.1, DO_Girar_B;
+                CASE 8: PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
+                CASE 9: PulseDO \High \PLength:=0.1, DO_Girar_R;
+                CASE 10: PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
+                CASE 11: PulseDO \High \PLength:=0.1, DO_Girar_L;
+                CASE 12: PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
+                CASE 13: PulseDO \High \PLength:=0.1, DO_Girar_U; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_U;
+                CASE 14: PulseDO \High \PLength:=0.1, DO_Girar_F; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_F;
+                CASE 15: PulseDO \High \PLength:=0.1, DO_Girar_D; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_D;
+                CASE 16: PulseDO \High \PLength:=0.1, DO_Girar_B; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_B;
+                CASE 17: PulseDO \High \PLength:=0.1, DO_Girar_R; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_R;
+                CASE 18: PulseDO \High \PLength:=0.1, DO_Girar_L; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_L;
+            ENDTEST
+            WaitTime t_anim;
+            
+            id_procesado := id_recibido;
+            SalidaRubik{1} := NumToDnum(id_procesado);
+        ENDWHILE
+        
+        FinMezclado:
+        
+        ! FASE 2: RUTINA DE ESCANEO
+        Rutina_Escanear_Cubo;
+
+        TPWrite "Escaneo fin. Esperando SOLUCION...";
+        
+        ! --- RESET DEL CONTADOR ---
+        id_procesado := 0;
+        SalidaRubik{1} := NumToDnum(0);
+        
+        ! FASE 3: BUCLE DE RESOLUCIÓN
+        WHILE TRUE DO
+            WaitUntil DnumToNum(EntradaRubik{1}) > id_procesado \PollRate:=0.01;
+            id_recibido := DnumToNum(EntradaRubik{1});
+            cmd := DnumToNum(EntradaRubik{2});
+
+            IF cmd = 998 GOTO Abortar;
+            IF cmd = 0 GOTO Fin;
+
+            IF cmd = 99 THEN
+                TPWrite "Iniciando resolucion fisica...";
+                t_anim := 0.7; 
+                bResolviendo := TRUE; 
+            ELSE
+                IF bResolviendo = FALSE THEN
+                    TEST cmd
+                        CASE 1: PulseDO \High \PLength:=0.1, DO_Girar_U;
+                        CASE 2: PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
+                        CASE 3: PulseDO \High \PLength:=0.1, DO_Girar_F;
+                        CASE 4: PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
+                        CASE 5: PulseDO \High \PLength:=0.1, DO_Girar_D;
+                        CASE 6: PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
+                        CASE 7: PulseDO \High \PLength:=0.1, DO_Girar_B;
+                        CASE 8: PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
+                        CASE 9: PulseDO \High \PLength:=0.1, DO_Girar_R;
+                        CASE 10: PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
+                        CASE 11: PulseDO \High \PLength:=0.1, DO_Girar_L;
+                        CASE 12: PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
+                        CASE 13: PulseDO \High \PLength:=0.1, DO_Girar_U; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_U;
+                        CASE 14: PulseDO \High \PLength:=0.1, DO_Girar_F; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_F;
+                        CASE 15: PulseDO \High \PLength:=0.1, DO_Girar_D; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_D;
+                        CASE 16: PulseDO \High \PLength:=0.1, DO_Girar_B; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_B;
+                        CASE 17: PulseDO \High \PLength:=0.1, DO_Girar_R; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_R;
+                        CASE 18: PulseDO \High \PLength:=0.1, DO_Girar_L; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_L;
+                    ENDTEST
+                    WaitTime t_anim;
+                ELSE
+                    TEST cmd
+                        CASE 1: Girar_U; CASE 2: Girar_U_Prima;
+                        CASE 3: Girar_F; CASE 4: Girar_F_Prima;
+                        CASE 5: Girar_D; CASE 6: Girar_D_Prima;
+                        CASE 7: Girar_B; CASE 8: Girar_B_Prima;
+                        CASE 9: Girar_R; CASE 10: Girar_R_Prima;
+                        CASE 11: Girar_L; CASE 12: Girar_L_Prima;
+                        CASE 13: Girar_U_Doble; CASE 14: Girar_F_Doble;
+                        CASE 15: Girar_D_Doble; CASE 16: Girar_B_Doble;
+                        CASE 17: Girar_R_Doble; CASE 18: Girar_L_Doble;
+                    ENDTEST
+                ENDIF
+            ENDIF
+
+            id_procesado := id_recibido;
+            SalidaRubik{1} := NumToDnum(id_procesado);
+        ENDWHILE
+        
+        Fin:
+        SalidaRubik{1} := NumToDnum(999);
+        WaitTime 0.5;
+        
+        Abortar:
+        EGMStop egmID1, EGM_STOP_HOLD;
+        TPWrite "=== CUBO FINALIZADO ===";
+        MoveJ pHome, vRapida, zLibre, PincGripper \WObj:=wobj_Cubo;
+        Stop;
+    ENDPROC
+ENDMODULE

@@ -1,0 +1,576 @@
+MODULE Module_Movimientos
+    ! --- VARIABLES GLOBALES Y LOCALES (SIEMPRE ARRIBA DEL TODO) ---
+    PERS num mem_giro_j6 := -180;
+    LOCAL VAR jointtarget jCamara;
+    LOCAL VAR bool camara_aprendida := FALSE;
+    LOCAL CONST num angRef := 180;   ! angulo con el que se aprende la postura
+
+    ! --- CONSTANTES DE VELOCIDAD Y ZONA ---
+    CONST speeddata vAprox := v500;
+    CONST speeddata vAgarre := v100;
+    CONST speeddata vGiro := v200;
+    CONST speeddata vRapida := v1000;
+    CONST zonedata zAprox := z5;
+    CONST zonedata zLibre := z30;
+
+    ! --- CONSTANTES DE DISTANCIA Y WOBJ ---
+    CONST num dAprox := 50;
+    CONST num dSegura := 130;
+    TASK PERS wobjdata wobj_Cubo:=[FALSE,TRUE,"",[[57.5,527.5,291.5],[1,0,0,0]],[[0,0,0],[1,0,0,0]]];
+    PERS tooldata PincGripper:=[TRUE,[[0,0,150],[0,0,0,1]],[1,[0,0,40],[1,0,0,0],0,0,0]];
+    
+    CONST pose pose0 := [[0,0,0],[1,0,0,0]];
+    CONST robtarget pHome:=[[0,0,172],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pU_Grip:=[[0,0,18.7],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pU_Rot90:=[[0,0,18.7],[0,0.707106781,0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pWhole_Grip:=[[0,0,0],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pU_RotNeg90:=[[0,0,18.7],[0,-0.707106781,-0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pCamara := [[857.5,292.5,600],[0.5,-0.5,0.5,0.5],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    ! Procedimientos básicos de pinza
+    PROC Cerrar_Pinza()
+        SetDO do_Gripper_Close, 1;
+        Reset do_Gripper_Open;
+        WaitTime 0.5;
+    ENDPROC
+
+    PROC Abrir_Pinza()
+        SetDO do_Gripper_Open, 1;
+        Reset do_Gripper_Close;
+        WaitTime 0.5;
+    ENDPROC
+
+    ! Movimiento físico de giro de la cara superior
+    PROC Mov_Girar_U(num sentido)
+        VAR num rotZ := 0;
+
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pU_Grip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pU_Grip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        !Cerrar_Pinza;
+        WaitTime 0.2;
+        
+        IF sentido = 1 THEN
+            rotZ := 90;
+        ELSEIF sentido = -1 THEN
+            rotZ := -90;
+        ELSEIF sentido = 2 THEN
+            rotZ := 180;
+        ENDIF
+        
+        ! Giro físico de la cara
+        MoveL RelTool(pU_Grip, 0, 0, 0 \Rz:=rotZ), vGiro, fine, PincGripper \WObj:=wobj_Cubo;
+        
+        !Abrir_Pinza;
+        WaitTime 0.2;
+        
+        ! SALIDA SEGURA: Nos alejamos MANTENIENDO la rotación actual
+        MoveL RelTool(pU_Grip, 0, 0, -dAprox \Rz:=rotZ), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=rotZ), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        
+        ! Una vez en zona segura (dSegura), desenroscamos el eje 6 de vuelta a 0º
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vRapida, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+
+    ! Normaliza un angulo de eje 6 a los limites del GoFa (+-270)
+    LOCAL FUNC num Norm_Eje6(num v)
+        VAR num r;
+        r := v;
+        WHILE r > 270 DO
+            r := r - 360;
+        ENDWHILE
+        WHILE r < -270 DO
+            r := r + 360;
+        ENDWHILE
+        RETURN r;
+    ENDFUNC
+
+    ! Normaliza un angulo de cara a (-180, 180] (270 => -90, misma cara)
+    LOCAL FUNC num Norm_Angulo(num v)
+        VAR num r;
+        r := v;
+        WHILE r > 180 DO
+            r := r - 360;
+        ENDWHILE
+        WHILE r <= -180 DO
+            r := r + 360;
+        ENDWHILE
+        RETURN r;
+    ENDFUNC
+    
+    ! ==========================================================
+    ! RUTINAS DE VISIÓN ARTIFICIAL (ESCANEO DE CARAS)
+    ! ==========================================================
+    PROC Handshake_Foto()
+        SalidaRubik{2} := NumToDnum(1); 
+        WaitTime 0.1; 
+        WaitUntil DnumToNum(EntradaRubik{3}) = 1 \PollRate:=0.05; 
+
+        SalidaRubik{2} := NumToDnum(0); 
+        WaitTime 0.1; 
+        WaitUntil DnumToNum(EntradaRubik{3}) = 0 \PollRate:=0.05; 
+    ENDPROC
+
+    PROC Presentar_Y_Fotografiar(num angulo_Z)
+        VAR jointtarget jDestino;
+        VAR num delta;
+
+        delta := Norm_Angulo(angulo_Z - angRef);
+
+        IF NOT camara_aprendida THEN
+            ! Primera llegada: cartesiano (con el ConfJ Off / SingArea que
+            ! ya activa Escanear_Par) y APRENDEMOS la postura de ejes.
+            MoveJ RelTool(pCamara, 0, 0, 0 \Rz:=angRef), vGiro, fine, PincGripper \WObj:=wobj0;
+            WaitRob \InPos;
+            jCamara := CJointT();
+            camara_aprendida := TRUE;
+            IF delta <> 0 THEN
+                jDestino := CJointT();
+                jDestino.robax.rax_6 := Norm_Eje6(jDestino.robax.rax_6 + delta);
+                MoveAbsJ jDestino, vGiro, fine, PincGripper;
+                WaitRob \InPos;
+            ENDIF
+        ELSE
+            ! Llegadas siguientes: SIEMPRE la misma postura memorizada,
+            ! con el eje 6 en el delta de la cara pedida. Sin cinematica
+            ! inversa y sin enrollamiento acumulativo posible.
+            jDestino := jCamara;
+            jDestino.robax.rax_6 := Norm_Eje6(jCamara.robax.rax_6 + delta);
+            MoveAbsJ jDestino, vGiro, fine, PincGripper;
+            WaitRob \InPos;
+        ENDIF
+        Handshake_Foto;
+    ENDPROC
+
+    PROC Girar_Muneca_Y_Fotografiar()
+        VAR jointtarget jActual;
+        jActual := CJointT();
+        
+        ! Decidimos el giro y lo GUARDAMOS en la memoria
+        IF jActual.robax.rax_6 > 0 THEN
+            mem_giro_j6 := -180;
+        ELSE
+            mem_giro_j6 := 180;
+        ENDIF
+        
+        jActual.robax.rax_6 := jActual.robax.rax_6 + mem_giro_j6;
+        MoveAbsJ jActual, vGiro, fine, PincGripper;
+        WaitRob \InPos;
+        Handshake_Foto;
+    ENDPROC
+
+    PROC Deshacer_Giro_Muneca()
+        VAR jointtarget jActual;
+        jActual := CJointT();
+        
+        ! Restamos exactamente lo que sumamos antes. Cero fallos posibles.
+        jActual.robax.rax_6 := jActual.robax.rax_6 - mem_giro_j6;
+        MoveAbsJ jActual, vGiro, fine, PincGripper;
+        WaitRob \InPos;
+    ENDPROC
+
+    PROC Escanear_Par(num rz_agarre, num rz_cara1)
+        ! 1. Recoger con la muneca a rz_agarre
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pU_Grip, 0, 0, -dAprox \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pU_Grip, 0, 0, 0 \Rz:=rz_agarre), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Cerrar_Pinza;
+        MoveL RelTool(pU_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+
+        ! === ZONA DE VUELO LIBRE ===
+        ConfJ \Off;
+        SingArea \Wrist;
+
+        ! 2. Presentar, girar y deshacer (todo en vuelo libre)
+        Presentar_Y_Fotografiar (rz_cara1 + rz_agarre);
+        Girar_Muneca_Y_Fotografiar;
+        Deshacer_Giro_Muneca;
+
+       ! 3. Volver a activar rigidez geométrica para el descenso
+        SingArea \Off;
+        ConfJ \On;
+        
+        ! 4. Descenso y depositar
+        ! CAMBIADO: MoveL a MoveJ para evitar el error 50436
+        MoveJ RelTool(pU_Grip, 0, 0, -dAprox \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, 0 \Rz:=rz_agarre), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    ! ==========================================================
+    ! SECUENCIA PRINCIPAL DE ESCANEO (Sincronizada con Python)
+    ! ==========================================================
+    PROC Rutina_Escanear_Cubo()
+        TPWrite "Iniciando escaneo visual optimizado (3 viajes x 2 caras)...";
+
+        ! GEOMETRIA DEL AGARRE (validada en estacion): con el agarre normal
+        ! (Rz=0) los dedos quedan sobre F/B, y el par expuesto es L/R:
+        !   Rz=180 -> cara L arriba   |   Rz=0 -> cara R arriba
+        ! Con el agarre girado 90 los dedos quedan sobre L/R y se expone F/B.
+
+        ! ---------------------------------------------------
+        ! VIAJE 1: agarre 0 (dedos F/B) -> caras L y R
+        ! ---------------------------------------------------
+        TPWrite "Robot: Ensenando caras L y R a la camara...";
+        Escanear_Par 0, 180;       ! <--- L primero; la R sale sola con el giro de muneca
+
+        ! ---------------------------------------------------
+        ! VIAJE 2: agarre 90 (dedos L/R) -> caras F y B
+        ! (el cubo NO se voltea entre el viaje 1 y el 2)
+        ! ---------------------------------------------------
+        TPWrite "Robot: Ensenando caras F y B a la camara...";
+        Escanear_Par 90, 180;      ! <--- si F/B salen intercambiadas, cambia 180 por 0
+
+        ! ---------------------------------------------------
+        ! VIAJE 3: UN volteo (F->U, U->B, B->D, D->F) deja las antiguas
+        ! D y U en las posiciones F/B, que se exponen con agarre 90.
+        ! ---------------------------------------------------
+        TPWrite "Robot: Ensenando caras D y U a la camara...";
+        Mov_Voltear_F_a_U;
+        Escanear_Par 90, 180;      ! <--- si D/U salen intercambiadas, cambia 180 por 0
+        Mov_Devolver_U_a_F;        ! restaura la orientacion ORIGINAL del cubo
+
+        MoveL RelTool(pU_Grip, 0, 0, -dSegura), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+
+        !!Anadir punto de reposo
+        
+        TPWrite "Escaneo terminado. Esperando resolucion de Kociemba...";
+    ENDPROC
+    
+! ==========================================================
+    ! RUTINAS DE REORIENTACIÓN (Método 45º - ENTRADA VERTICAL)
+    ! ==========================================================
+
+    ! --- Cara RIGHT (R) ---
+    PROC Mov_Voltear_R_a_U()
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+
+        pGrip45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=45);
+        pGripNeg45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-45);
+
+        ! Aproximación vertical (Offs) con pinza a 45º
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        Cerrar_Pinza;
+        
+        ! Extracción vertical hacia arriba
+        MoveL Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        ! Tránsito en el aire (arriba)
+        MoveJ Offs(pWhole_Grip, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;        
+        
+        ! Descenso vertical para soltar
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        ! Salida vertical hacia arriba
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    PROC Mov_Devolver_U_a_R()
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+
+        pGrip45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=45);
+        pGripNeg45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-45);
+
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Cerrar_Pinza;
+        
+        MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pWhole_Grip, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    ! --- Cara LEFT (L) ---
+    PROC Mov_Voltear_L_a_U()
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+
+        pGrip45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-45);
+        pGripNeg45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=45);
+
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        Cerrar_Pinza;
+        
+        MoveL Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pWhole_Grip, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;        
+        
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    PROC Mov_Devolver_U_a_L()
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+
+        pGrip45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-45);
+        pGripNeg45 := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=45);
+
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Cerrar_Pinza;
+        
+        MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pWhole_Grip, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+    
+    ! ==========================================================
+    ! --- Cara FRONT (F) ---
+    ! ==========================================================
+    PROC Mov_Voltear_F_a_U()
+        VAR robtarget pBaseF;
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+        
+        pBaseF := RelTool(pWhole_Grip, 0, 0, 0 \Rz:=90);
+        pGrip45 := RelTool(pBaseF, 0, 0, 0 \Ry:=45);
+        pGripNeg45 := RelTool(pBaseF, 0, 0, 0 \Ry:=-45);
+
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        Cerrar_Pinza;
+        
+        MoveL Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pBaseF, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;        
+        
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    PROC Mov_Devolver_U_a_F()
+        VAR robtarget pBaseF;
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+        
+        pBaseF := RelTool(pWhole_Grip, 0, 0, 0 \Rz:=90);
+        pGrip45 := RelTool(pBaseF, 0, 0, 0 \Ry:=45);
+        pGripNeg45 := RelTool(pBaseF, 0, 0, 0 \Ry:=-45);
+
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Cerrar_Pinza;
+        
+        MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pBaseF, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    ! ==========================================================
+    ! --- Cara BACK (B) ---
+    ! ==========================================================
+    PROC Mov_Voltear_B_a_U()
+        VAR robtarget pBaseB;
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+        
+        pBaseB := RelTool(pWhole_Grip, 0, 0, 0 \Rz:=-90);
+        pGrip45 := RelTool(pBaseB, 0, 0, 0 \Ry:=45);
+        pGripNeg45 := RelTool(pBaseB, 0, 0, 0 \Ry:=-45);
+
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        Cerrar_Pinza;
+        
+        MoveL Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pBaseB, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;        
+        
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    PROC Mov_Devolver_U_a_B()
+        VAR robtarget pBaseB;
+        VAR robtarget pGrip45;
+        VAR robtarget pGripNeg45;
+        
+        pBaseB := RelTool(pWhole_Grip, 0, 0, 0 \Rz:=-90);
+        pGrip45 := RelTool(pBaseB, 0, 0, 0 \Ry:=45);
+        pGripNeg45 := RelTool(pBaseB, 0, 0, 0 \Ry:=-45);
+
+        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Cerrar_Pinza;
+        
+        MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pBaseB, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+    
+    ! ==========================================================
+    ! Cara DOWN (D) - SALIDA VERTICAL SEGURA
+    ! ==========================================================
+    PROC Mov_Voltear_D_a_U()
+        VAR jointtarget j_pos;
+        VAR robtarget p_actual;
+        VAR robtarget pSideGrip;
+
+        ! El agarre lateral se define rotando -90 en Y
+        pSideGrip := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-90);
+
+        ! 1. Aproximación pura sobre el eje Z de la pinza (que ahora es horizontal)
+        MoveJ RelTool(pSideGrip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pSideGrip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        ! 2. Agarre horizontal
+        MoveL pSideGrip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        Cerrar_Pinza;
+        
+        ! 3. Subida vertical recta respecto al plano de la mesa (WObj)
+        p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
+        MoveL Offs(p_actual, 0, 0, dSegura), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+        WaitRob \InPos;
+
+        ! 4. GIRAR 180º (Eje 6)
+        j_pos := CJointT();
+        j_pos.robax.rax_6 := j_pos.robax.rax_6 + 180; 
+        MoveAbsJ j_pos, vGiro, fine, PincGripper; 
+        WaitRob \InPos;
+        
+        ! 5. Bajada vertical pura
+        p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
+        MoveL Offs(p_actual, 0, 0, -dSegura), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        ! 6. Salida vertical pura hacia arriba
+        p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
+        MoveL Offs(p_actual, 0, 0, dSegura), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+        
+        ! 7. Retorno al plano de reposo
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    PROC Mov_Devolver_U_a_D()
+        VAR jointtarget j_pos;
+        VAR robtarget p_actual;
+        VAR robtarget pSideGrip;
+
+        pSideGrip := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-90);
+
+        MoveJ RelTool(pSideGrip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pSideGrip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pSideGrip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        Cerrar_Pinza;
+        
+        p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
+        MoveL Offs(p_actual, 0, 0, dSegura), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+        WaitRob \InPos;
+        
+        ! 4. DESENROSCAR 180º
+        j_pos := CJointT();
+        j_pos.robax.rax_6 := j_pos.robax.rax_6 - 180;
+        MoveAbsJ j_pos, vGiro, fine, PincGripper;
+        WaitRob \InPos;
+        
+        p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
+        MoveL Offs(p_actual, 0, 0, -dSegura), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
+        MoveL Offs(p_actual, 0, 0, dSegura), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+    
+    ! ==========================================================
+    ! GIRO DEL CUBO ENTERO (Levantando el cubo a plano seguro)
+    ! ==========================================================
+    
+    PROC Mov_Girar_Cubo_Entero_90()
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pU_Grip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pU_Grip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Cerrar_Pinza;
+        
+        MoveL RelTool(pU_Grip, 0, 0, -dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=90), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL RelTool(pU_Grip, 0, 0, 0 \Rz:=90), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL RelTool(pU_Grip, 0, 0, -dAprox \Rz:=90), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=90), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+    PROC Mov_Girar_Cubo_Entero_Neg90()
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pU_Grip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL pU_Grip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Cerrar_Pinza;
+        
+        MoveL RelTool(pU_Grip, 0, 0, -dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=-90), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;
+        
+        MoveL RelTool(pU_Grip, 0, 0, 0 \Rz:=-90), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        Abrir_Pinza;
+        
+        MoveL RelTool(pU_Grip, 0, 0, -dAprox \Rz:=-90), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=-90), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pU_Grip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+    ENDPROC
+
+ENDMODULE
