@@ -16,26 +16,30 @@ MODULE Module_Movimientos
     ! --- CONSTANTES DE DISTANCIA Y WOBJ ---
     CONST num dAprox := 50;
     CONST num dSegura := 130;
+    
+    CONST num offset := 18;
+    
     TASK PERS wobjdata wobj_Cubo:=[FALSE,TRUE,"",[[57.5,527.5,291.5],[1,0,0,0]],[[0,0,0],[1,0,0,0]]];
     PERS tooldata PincGripper:=[TRUE,[[0,0,150],[0,0,0,1]],[1,[0,0,40],[1,0,0,0],0,0,0]];
     
     CONST pose pose0 := [[0,0,0],[1,0,0,0]];
-    CONST robtarget pHome:=[[0,0,172],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    CONST robtarget pU_Grip:=[[0,0,18.7],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pHome:=[[515.19,-527.06,164.90],[5.39197E-05,0.701431,-0.712738,-3.65967E-05],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pU_Grip:=[[515.21,-527.06,24],[6.45796E-05,0.701433,-0.712736,-4.60777E-05],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget pU_Rot90:=[[0,0,18.7],[0,0.707106781,0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    CONST robtarget pWhole_Grip:=[[0,0,0],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pWhole_Grip:=[[515.22,-527.07,9.92],[4.82484E-05,0.701432,-0.712736,-2.99622E-05],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget pU_RotNeg90:=[[0,0,18.7],[0,-0.707106781,-0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    CONST robtarget pCamara := [[857.5,292.5,600],[0.5,-0.5,0.5,0.5],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    ! Procedimientos básicos de pinza
+    CONST robtarget pCamara:=[[873.67,268.73,458.82],[0.707002,-8.46274E-05,0.707212,5.31954E-05],[0,0,1,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];    ! Procedimientos básicos de pinza
     PROC Cerrar_Pinza()
-        SetDO do_Gripper_Close, 1;
-        Reset do_Gripper_Open;
+!        SetDO do_Gripper_Close, 1;
+!        Reset do_Gripper_Open;
+        Set Local_IO_0_DO1;
         WaitTime 0.5;
     ENDPROC
 
     PROC Abrir_Pinza()
-        SetDO do_Gripper_Open, 1;
-        Reset do_Gripper_Close;
+!        SetDO do_Gripper_Open, 1;
+!        Reset do_Gripper_Close;
+        Reset Local_IO_0_DO1;
         WaitTime 0.5;
     ENDPROC
 
@@ -47,7 +51,7 @@ MODULE Module_Movimientos
         MoveL RelTool(pU_Grip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
         MoveL pU_Grip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
-        !Cerrar_Pinza;
+        Cerrar_Pinza;
         WaitTime 0.2;
         
         IF sentido = 1 THEN
@@ -61,7 +65,7 @@ MODULE Module_Movimientos
         ! Giro físico de la cara
         MoveL RelTool(pU_Grip, 0, 0, 0 \Rz:=rotZ), vGiro, fine, PincGripper \WObj:=wobj_Cubo;
         
-        !Abrir_Pinza;
+        Abrir_Pinza;
         WaitTime 0.2;
         
         ! SALIDA SEGURA: Nos alejamos MANTENIENDO la rotación actual
@@ -183,16 +187,17 @@ MODULE Module_Movimientos
         SingArea \Wrist;
 
         ! 2. Presentar, girar y deshacer (todo en vuelo libre)
-        Presentar_Y_Fotografiar (rz_cara1 + rz_agarre);
+        ! CORRECCIÓN: Quitamos el '+ rz_agarre'. 
+        ! Queremos que la pinza adopte la MISMA postura física siempre.
+        Presentar_Y_Fotografiar rz_cara1;
         Girar_Muneca_Y_Fotografiar;
         Deshacer_Giro_Muneca;
 
-       ! 3. Volver a activar rigidez geométrica para el descenso
+        ! 3. Volver a activar rigidez geométrica para el descenso
         SingArea \Off;
         ConfJ \On;
         
         ! 4. Descenso y depositar
-        ! CAMBIADO: MoveL a MoveJ para evitar el error 50436
         MoveJ RelTool(pU_Grip, 0, 0, -dAprox \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ RelTool(pU_Grip, 0, 0, 0 \Rz:=rz_agarre), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
@@ -355,9 +360,9 @@ MODULE Module_Movimientos
         VAR robtarget pGrip45;
         VAR robtarget pGripNeg45;
         
-        pBaseF := RelTool(pWhole_Grip, 0, 0, 0 \Rz:=90);
+        pBaseF := RelTool(pU_Grip, 0, 0, 0 \Rz:=90);
         pGrip45 := RelTool(pBaseF, 0, 0, 0 \Ry:=45);
-        pGripNeg45 := RelTool(pBaseF, 0, 0, 0 \Ry:=-45);
+        pGripNeg45 := RelTool(pBaseF, offset, 0, 0 \Ry:=-45);
 
         MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
         MoveL Offs(pGrip45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
@@ -369,7 +374,9 @@ MODULE Module_Movimientos
         MoveJ Offs(pBaseF, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;        
         
-        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        !MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, 0, 0, -10), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+
         Abrir_Pinza;
         
         MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
@@ -381,8 +388,8 @@ MODULE Module_Movimientos
         VAR robtarget pGrip45;
         VAR robtarget pGripNeg45;
         
-        pBaseF := RelTool(pWhole_Grip, 0, 0, 0 \Rz:=90);
-        pGrip45 := RelTool(pBaseF, 0, 0, 0 \Ry:=45);
+        pBaseF := RelTool(pU_Grip, 0, 0, 0 \Rz:=90);
+        pGrip45 := RelTool(pBaseF, -offset, 0, 0 \Ry:=45);
         pGripNeg45 := RelTool(pBaseF, 0, 0, 0 \Ry:=-45);
 
         MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
@@ -395,7 +402,9 @@ MODULE Module_Movimientos
         MoveJ Offs(pBaseF, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        !MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, 0, 0, -10), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+
         Abrir_Pinza;
         
         MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    

@@ -3,7 +3,7 @@ MODULE Module1
 
     ! Matrices de 100 posiciones con NOMBRES NUEVOS para forzar memoria limpia
     PERS dnum EntradaRubik{40};
-    PERS dnum SalidaRubik{40} := [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];      
+    PERS dnum SalidaRubik{40} := [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];      
     ! ==========================================================
     ! RUTINA TEMPORAL DE TEST PING-PONG EGM
     ! ==========================================================
@@ -38,26 +38,26 @@ MODULE Module1
     ! -----------------------------------------------------------------
     ! MAIN DE PRUEBAS (Física y Lógica local sin Python)
     ! -----------------------------------------------------------------
-    PROC main_pruebas()
+    PROC main()
         ! --- Dar libertad a las articulaciones ---
         !ConfL \Off;
         !ConfJ \Off;
         !SingArea \Wrist; ! Esto ayuda a evitar el bloqueo en el eje 5
-        
-        Reset do_Gripper_Close;
-        Reset do_Gripper_Open;
+        reset Local_IO_0_DO1;
+!        Reset do_Gripper_Close;
+!        Reset do_Gripper_Open;
         
         TPWrite "=== INICIANDO TEST UNITARIO DE CARAS ===";
         ! Usamos las nuevas constantes de velocidad y zona
         MoveJ pHome, vGiro, zLibre, PincGripper \WObj:=wobj_Cubo;
         
-        Rutina_Escanear_Cubo;
+        !Rutina_Escanear_Cubo;
         
         ! Descomenta SOLO la cara que quieras probar en este momento
         
-        !TPWrite "Probando F (Front)...";
-        !Girar_F;
-        !WaitTime 2.0; ! Pausa para observar
+        TPWrite "Probando F (Front)...";
+        Girar_F;
+        WaitTime 2.0; ! Pausa para observar
         
         !TPWrite "Probando B (Back)...";
         !Girar_B;
@@ -88,14 +88,17 @@ MODULE Module1
     ! MAIN DE PRODUCCIÓN (Conexión Python - EGM)
     ! -----------------------------------------------------------------
     
-   PROC main()
+   PROC main_bueno()
         VAR num cmd;
         VAR num id_recibido;
         VAR num id_procesado := 0;
         VAR bool bResolviendo := FALSE; 
         
-        Reset do_Gripper_Close;
-        Reset do_Gripper_Open;
+!        MoveJ pCamara, v100, fine, PincGripper\WObj:=wobj0;
+        
+        Reset Local_IO_0_DO1;
+!        Reset do_Gripper_Close;
+!        Reset do_Gripper_Open;
         
         t_anim := 0.15;  
         TPWrite "=== SISTEMA OK: ESPERANDO PYTHON ===";
@@ -129,26 +132,26 @@ MODULE Module1
                 GOTO FinMezclado;
             ENDIF
 
-            TEST cmd
-                CASE 1: PulseDO \High \PLength:=0.1, DO_Girar_U;
-                CASE 2: PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
-                CASE 3: PulseDO \High \PLength:=0.1, DO_Girar_F;
-                CASE 4: PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
-                CASE 5: PulseDO \High \PLength:=0.1, DO_Girar_D;
-                CASE 6: PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
-                CASE 7: PulseDO \High \PLength:=0.1, DO_Girar_B;
-                CASE 8: PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
-                CASE 9: PulseDO \High \PLength:=0.1, DO_Girar_R;
-                CASE 10: PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
-                CASE 11: PulseDO \High \PLength:=0.1, DO_Girar_L;
-                CASE 12: PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
-                CASE 13: PulseDO \High \PLength:=0.1, DO_Girar_U; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_U;
-                CASE 14: PulseDO \High \PLength:=0.1, DO_Girar_F; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_F;
-                CASE 15: PulseDO \High \PLength:=0.1, DO_Girar_D; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_D;
-                CASE 16: PulseDO \High \PLength:=0.1, DO_Girar_B; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_B;
-                CASE 17: PulseDO \High \PLength:=0.1, DO_Girar_R; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_R;
-                CASE 18: PulseDO \High \PLength:=0.1, DO_Girar_L; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_L;
-            ENDTEST
+!            TEST cmd
+!                CASE 1: PulseDO \High \PLength:=0.1, DO_Girar_U;
+!                CASE 2: PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
+!                CASE 3: PulseDO \High \PLength:=0.1, DO_Girar_F;
+!                CASE 4: PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
+!                CASE 5: PulseDO \High \PLength:=0.1, DO_Girar_D;
+!                CASE 6: PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
+!                CASE 7: PulseDO \High \PLength:=0.1, DO_Girar_B;
+!                CASE 8: PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
+!                CASE 9: PulseDO \High \PLength:=0.1, DO_Girar_R;
+!                CASE 10: PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
+!                CASE 11: PulseDO \High \PLength:=0.1, DO_Girar_L;
+!                CASE 12: PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
+!                CASE 13: PulseDO \High \PLength:=0.1, DO_Girar_U; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_U;
+!                CASE 14: PulseDO \High \PLength:=0.1, DO_Girar_F; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_F;
+!                CASE 15: PulseDO \High \PLength:=0.1, DO_Girar_D; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_D;
+!                CASE 16: PulseDO \High \PLength:=0.1, DO_Girar_B; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_B;
+!                CASE 17: PulseDO \High \PLength:=0.1, DO_Girar_R; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_R;
+!                CASE 18: PulseDO \High \PLength:=0.1, DO_Girar_L; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_L;
+!            ENDTEST
             WaitTime t_anim;
             
             id_procesado := id_recibido;
@@ -181,26 +184,26 @@ MODULE Module1
                 bResolviendo := TRUE; 
             ELSE
                 IF bResolviendo = FALSE THEN
-                    TEST cmd
-                        CASE 1: PulseDO \High \PLength:=0.1, DO_Girar_U;
-                        CASE 2: PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
-                        CASE 3: PulseDO \High \PLength:=0.1, DO_Girar_F;
-                        CASE 4: PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
-                        CASE 5: PulseDO \High \PLength:=0.1, DO_Girar_D;
-                        CASE 6: PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
-                        CASE 7: PulseDO \High \PLength:=0.1, DO_Girar_B;
-                        CASE 8: PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
-                        CASE 9: PulseDO \High \PLength:=0.1, DO_Girar_R;
-                        CASE 10: PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
-                        CASE 11: PulseDO \High \PLength:=0.1, DO_Girar_L;
-                        CASE 12: PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
-                        CASE 13: PulseDO \High \PLength:=0.1, DO_Girar_U; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_U;
-                        CASE 14: PulseDO \High \PLength:=0.1, DO_Girar_F; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_F;
-                        CASE 15: PulseDO \High \PLength:=0.1, DO_Girar_D; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_D;
-                        CASE 16: PulseDO \High \PLength:=0.1, DO_Girar_B; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_B;
-                        CASE 17: PulseDO \High \PLength:=0.1, DO_Girar_R; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_R;
-                        CASE 18: PulseDO \High \PLength:=0.1, DO_Girar_L; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_L;
-                    ENDTEST
+!                    TEST cmd
+!                        CASE 1: PulseDO \High \PLength:=0.1, DO_Girar_U;
+!                        CASE 2: PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
+!                        CASE 3: PulseDO \High \PLength:=0.1, DO_Girar_F;
+!                        CASE 4: PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
+!                        CASE 5: PulseDO \High \PLength:=0.1, DO_Girar_D;
+!                        CASE 6: PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
+!                        CASE 7: PulseDO \High \PLength:=0.1, DO_Girar_B;
+!                        CASE 8: PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
+!                        CASE 9: PulseDO \High \PLength:=0.1, DO_Girar_R;
+!                        CASE 10: PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
+!                        CASE 11: PulseDO \High \PLength:=0.1, DO_Girar_L;
+!                        CASE 12: PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
+!                        CASE 13: PulseDO \High \PLength:=0.1, DO_Girar_U; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_U;
+!                        CASE 14: PulseDO \High \PLength:=0.1, DO_Girar_F; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_F;
+!                        CASE 15: PulseDO \High \PLength:=0.1, DO_Girar_D; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_D;
+!                        CASE 16: PulseDO \High \PLength:=0.1, DO_Girar_B; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_B;
+!                        CASE 17: PulseDO \High \PLength:=0.1, DO_Girar_R; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_R;
+!                        CASE 18: PulseDO \High \PLength:=0.1, DO_Girar_L; WaitTime 0.2; PulseDO \High \PLength:=0.1, DO_Girar_L;
+!                    ENDTEST
                     WaitTime t_anim;
                 ELSE
                     TEST cmd

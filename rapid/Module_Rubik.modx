@@ -5,19 +5,19 @@ MODULE Module_Rubik
     ! --- CARA U (Arriba) ---
     PROC Girar_U() 
         Mov_Girar_U 1;
-        PulseDO \High \PLength:=0.1, DO_Girar_U; 
+        !PulseDO \High \PLength:=0.1, DO_Girar_U; 
         WaitTime t_anim;
     ENDPROC
     PROC Girar_U_Prima()
         Mov_Girar_U -1;  ! CORREGIDO: Inverso es -1
-        PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
+        !PulseDO \High \PLength:=0.1, DO_Girar_U_Prima;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_U_Doble()
         Mov_Girar_U 2;   ! 180 grados físicos
-        PulseDO \High \PLength:=0.1, DO_Girar_U;
+        !PulseDO \High \PLength:=0.1, DO_Girar_U;
         WaitTime 0.2;    ! Pausa para el Smart Component
-        PulseDO \High \PLength:=0.1, DO_Girar_U;
+        !PulseDO \High \PLength:=0.1, DO_Girar_U;
         WaitTime t_anim;
     ENDPROC
 
@@ -25,23 +25,23 @@ MODULE Module_Rubik
     PROC Girar_F()
         Mov_Voltear_F_a_U;
         Mov_Girar_U 1;
-        PulseDO \High \PLength:=0.1, DO_Girar_F;
+        !PulseDO \High \PLength:=0.1, DO_Girar_F;
         Mov_Devolver_U_a_F;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_F_Prima()
         Mov_Voltear_F_a_U;
         Mov_Girar_U -1;  ! CORREGIDO
-        PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
+        !PulseDO \High \PLength:=0.1, DO_Girar_F_Prima;
         Mov_Devolver_U_a_F;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_F_Doble()
         Mov_Voltear_F_a_U;
         Mov_Girar_U 2;
-        PulseDO \High \PLength:=0.1, DO_Girar_F;
+        !PulseDO \High \PLength:=0.1, DO_Girar_F;
         WaitTime 0.2;
-        PulseDO \High \PLength:=0.1, DO_Girar_F;
+        !PulseDO \High \PLength:=0.1, DO_Girar_F;
         Mov_Devolver_U_a_F;
         WaitTime t_anim;
     ENDPROC
@@ -50,23 +50,23 @@ MODULE Module_Rubik
     PROC Girar_R()
         Mov_Voltear_R_a_U;
         Mov_Girar_U 1;
-        PulseDO \High \PLength:=0.1, DO_Girar_R;
+        !PulseDO \High \PLength:=0.1, DO_Girar_R;
         Mov_Devolver_U_a_R;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_R_Prima()
         Mov_Voltear_R_a_U;
         Mov_Girar_U -1;  ! CORREGIDO
-        PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
+        !PulseDO \High \PLength:=0.1, DO_Girar_R_Prima;
         Mov_Devolver_U_a_R;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_R_Doble()
         Mov_Voltear_R_a_U;
         Mov_Girar_U 2;
-        PulseDO \High \PLength:=0.1, DO_Girar_R;
+        !PulseDO \High \PLength:=0.1, DO_Girar_R;
         WaitTime 0.2;
-        PulseDO \High \PLength:=0.1, DO_Girar_R;
+        !PulseDO \High \PLength:=0.1, DO_Girar_R;
         Mov_Devolver_U_a_R;
         WaitTime t_anim;
     ENDPROC
@@ -75,23 +75,23 @@ MODULE Module_Rubik
     PROC Girar_L()
         Mov_Voltear_L_a_U;
         Mov_Girar_U 1;
-        PulseDO \High \PLength:=0.1, DO_Girar_L;
+        !PulseDO \High \PLength:=0.1, DO_Girar_L;
         Mov_Devolver_U_a_L;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_L_Prima()
         Mov_Voltear_L_a_U;
         Mov_Girar_U -1;  ! CORREGIDO
-        PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
+        !PulseDO \High \PLength:=0.1, DO_Girar_L_Prima;
         Mov_Devolver_U_a_L;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_L_Doble()
         Mov_Voltear_L_a_U;
         Mov_Girar_U 2;
-        PulseDO \High \PLength:=0.1, DO_Girar_L;
+        !PulseDO \High \PLength:=0.1, DO_Girar_L;
         WaitTime 0.2;
-        PulseDO \High \PLength:=0.1, DO_Girar_L;
+        !PulseDO \High \PLength:=0.1, DO_Girar_L;
         Mov_Devolver_U_a_L;
         WaitTime t_anim;
     ENDPROC
@@ -100,23 +100,23 @@ MODULE Module_Rubik
     PROC Girar_B()
         Mov_Voltear_B_a_U;
         Mov_Girar_U 1;
-        PulseDO \High \PLength:=0.1, DO_Girar_B;
+        !PulseDO \High \PLength:=0.1, DO_Girar_B;
         Mov_Devolver_U_a_B;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_B_Prima()
         Mov_Voltear_B_a_U;
         Mov_Girar_U -1;  ! CORREGIDO
-        PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
+        !PulseDO \High \PLength:=0.1, DO_Girar_B_Prima;
         Mov_Devolver_U_a_B;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_B_Doble()
         Mov_Voltear_B_a_U;
         Mov_Girar_U 2;
-        PulseDO \High \PLength:=0.1, DO_Girar_B;
+        !PulseDO \High \PLength:=0.1, DO_Girar_B;
         WaitTime 0.2;
-        PulseDO \High \PLength:=0.1, DO_Girar_B;
+        !PulseDO \High \PLength:=0.1, DO_Girar_B;
         Mov_Devolver_U_a_B;
         WaitTime t_anim;
     ENDPROC
@@ -125,23 +125,23 @@ MODULE Module_Rubik
     PROC Girar_D()
         Mov_Voltear_D_a_U;
         Mov_Girar_U 1;
-        PulseDO \High \PLength:=0.1, DO_Girar_D;
+        !PulseDO \High \PLength:=0.1, DO_Girar_D;
         Mov_Devolver_U_a_D;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_D_Prima()
         Mov_Voltear_D_a_U;
         Mov_Girar_U -1;  ! CORREGIDO
-        PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
+        !PulseDO \High \PLength:=0.1, DO_Girar_D_Prima;
         Mov_Devolver_U_a_D;
         WaitTime t_anim;
     ENDPROC
     PROC Girar_D_Doble()
         Mov_Voltear_D_a_U;
         Mov_Girar_U 2;
-        PulseDO \High \PLength:=0.1, DO_Girar_D;
+        !PulseDO \High \PLength:=0.1, DO_Girar_D;
         WaitTime 0.2;
-        PulseDO \High \PLength:=0.1, DO_Girar_D;
+        !PulseDO \High \PLength:=0.1, DO_Girar_D;
         Mov_Devolver_U_a_D;
         WaitTime t_anim;
     ENDPROC

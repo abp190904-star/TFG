@@ -5,7 +5,9 @@ import time
 import os
 import subprocess
 
-# 1. RANGOS FÍSICOS
+# ==========================================
+# 1. RANGOS Y CONFIGURACIÓN DE COLOR
+# ==========================================
 RANGOS_HSV_REAL = {
     'blanco':   ([0, 0, 140],      [179, 65, 255],  'U'),
     'amarillo': ([29, 100, 100],   [41, 255, 255],  'D'),
@@ -16,7 +18,6 @@ RANGOS_HSV_REAL = {
     'rojo_2':   ([165, 117, 119],  [179, 255, 255], 'R')  
 }
 
-# 2. RANGOS VIRTUALES
 RANGOS_HSV_VIRTUAL = {
     'blanco':   ([0, 0, 180],      [179, 40, 255],  'U'), 
     'amarillo': ([25, 120, 120],   [35, 255, 255],  'D'),
@@ -27,6 +28,14 @@ RANGOS_HSV_VIRTUAL = {
     'rojo_2':   ([165, 140, 80],   [179, 255, 255], 'R')  
 }
 
+COLORES_BGR = {
+    'U': (255, 255, 255), 'R': (0, 0, 255), 'F': (0, 255, 0),
+    'D': (0, 255, 255),   'L': (0, 165, 255), 'B': (255, 0, 0)
+}
+
+# ==========================================
+# 2. FUNCIONES AUXILIARES DE ENTORNO Y VISIÓN
+# ==========================================
 def obtener_ruta_virtual_universal():
     try:
         comando = 'cmd.exe /c "echo %TEMP%"'
@@ -47,13 +56,10 @@ def obtener_color(hsv_pixel, diccionario_rangos):
             return letra
     return '?'
 
-# Radio de muestreo (en px) alrededor de cada centro de sticker. Lo fija
-# dibujar_cuadricula() en funcion del tamano detectado del cubo.
 _radio_muestreo = 3
 
 def muestrear_hsv(frame_hsv, px, py):
-    """Mediana HSV de un parche alrededor del punto: robusto frente a
-    ruido y bordes, a cualquier distancia del cubo."""
+    """Mediana HSV de un parche alrededor del punto: robusto frente a ruido y bordes."""
     r = max(1, _radio_muestreo)
     alto, ancho = frame_hsv.shape[:2]
     x0, x1 = max(0, px - r), min(ancho, px + r + 1)
@@ -61,78 +67,142 @@ def muestrear_hsv(frame_hsv, px, py):
     parche = frame_hsv[y0:y1, x0:x1].reshape(-1, 3)
     return np.median(parche, axis=0).astype(int)
 
-def dibujar_cuadricula(frame):
-    """DETECCION AUTOMATICA DEL CUBO: localiza la cara visible por color
-    (stickers saturados + marco negro del cubo) y ajusta la rejilla 3x3 a
-    su posicion y tamano reales, independientemente de la distancia a la
-    camara. El fondo gris y la pinza blanca (baja saturacion, brillo
-    medio/alto) quedan excluidos de la mascara.
-    Si no se detecta nada, usa la ultima posicion valida y, en su
-    defecto, la rejilla fija clasica en el centro del frame."""
+# ==========================================
+# 3. MATEMÁTICAS DE PROYECCIÓN 3D -> 2D
+# ==========================================
+def ordenar_puntos(pts):
+    """Ordena 4 puntos en el orden: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]"""
+    pts = np.array(pts, dtype=np.float32)
+    suma = pts.sum(axis=1)
+    tl = pts[np.argmin(suma)]
+    br = pts[np.argmax(suma)]
+    
+    dif = np.diff(pts, axis=1).flatten()
+    tr = pts[np.argmin(dif)]
+    bl = pts[np.argmax(dif)]
+    
+    return np.array([tl, tr, br, bl])
+
+def interpolar_punto(quad, tx, ty):
+    """Calcula un punto interpolado dentro de un cuadrilátero."""
+    p00, p10, p11, p01 = quad
+    top = (1 - tx) * p00 + tx * p10
+    bottom = (1 - tx) * p01 + tx * p11
+    punto = (1 - ty) * top + ty * bottom
+    return int(punto[0]), int(punto[1])
+
+# ==========================================
+# 4. MOTOR DE DETECCIÓN Y TRACKING
+# ==========================================
+def dibujar_cuadricula(frame, rangos_activos):
+    """
+    DETECCIÓN ROBUSTA EN MUNDO REAL: Localiza la cara del cubo fusionando las 
+    pegatinas de colores calibrados (omitiendo el blanco para evitar reflejos) 
+    y proyecta una rejilla 3x3 autoadaptativa y autorrotativa.
+    """
     global _radio_muestreo
     alto, ancho, _ = frame.shape
 
-    # --- 1. Mascara "esto es cubo": colores saturados O plastico negro ---
+    # --- 1. Crear máscara uniendo todos los colores saturados (menos blanco) ---
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    s, v = hsv[:, :, 1], hsv[:, :, 2]
-    mask_color = ((s >= 90) & (v >= 60)).astype(np.uint8) * 255
-    mask_negro = (v <= 70).astype(np.uint8) * 255
-    mask = cv2.bitwise_or(mask_color, mask_negro)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+    
+    for color, (bajo, alto_val, _) in rangos_activos.items():
+        if color == 'blanco':
+            continue
+        bajo_arr = np.array(bajo)
+        alto_arr = np.array(alto_val)
+        mask_temp = cv2.inRange(hsv, bajo_arr, alto_arr)
+        mask = cv2.bitwise_or(mask, mask_temp)
 
-    # --- 2. Contorno mayor con pinta de cara de cubo (cuadrado-ish) ---
+    # --- 2. Operaciones morfológicas para fusionar stickers en un bloque ---
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
+    mask_cerrada = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
+    
+    kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    mask_limpia = cv2.morphologyEx(mask_cerrada, cv2.MORPH_OPEN, kernel_open)
+
+    # --- 3. Encontrar el contorno que mejor encaje como cara del cubo ---
     deteccion = None
-    contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contornos, _ = cv2.findContours(mask_limpia, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
     if contornos:
-        c = max(contornos, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(c)
-        area_rel = (w * h) / float(ancho * alto)
-        ratio = w / float(h) if h > 0 else 0
-        if 0.01 < area_rel < 0.9 and 0.6 < ratio < 1.6:
-            deteccion = (x + w / 2.0, y + h / 2.0, min(w, h))
+        contornos_validos = []
+        for c in contornos:
+            area = cv2.contourArea(c)
+            if area < 4000:
+                continue
+            
+            rect = cv2.minAreaRect(c)
+            box = cv2.boxPoints(rect)
+            box = np.array(box, dtype=np.int32)
+            
+            (cx, cy), (w, h), angle = rect
+            if h == 0: continue
+            ratio = w / float(h)
+            if 0.65 < ratio < 1.5:
+                contornos_validos.append((area, box))
+        
+        if contornos_validos:
+            contornos_validos.sort(key=lambda x: x[0], reverse=True)
+            deteccion = contornos_validos[0][1]
 
-    # --- 3. Suavizado temporal (EMA) y memoria de ultima deteccion ---
+    # --- 4. Filtro de suavizado temporal (EMA) para evitar saltos ---
     if deteccion is not None:
-        if getattr(dibujar_cuadricula, 'caja', None) is None:
-            dibujar_cuadricula.caja = deteccion
+        quad_ordenado = ordenar_puntos(deteccion)
+        if getattr(dibujar_cuadricula, 'caja_suave', None) is None:
+            dibujar_cuadricula.caja_suave = quad_ordenado.astype(float)
         else:
-            a = 0.4  # peso de la medida nueva
-            pcx, pcy, pl = dibujar_cuadricula.caja
-            dibujar_cuadricula.caja = (pcx + a * (deteccion[0] - pcx),
-                                       pcy + a * (deteccion[1] - pcy),
-                                       pl + a * (deteccion[2] - pl))
-
-    if getattr(dibujar_cuadricula, 'caja', None) is not None:
-        ccx, ccy, lado_cubo = dibujar_cuadricula.caja
-        celda = lado_cubo / 3.0
-        estado = 'CUBO DETECTADO' if deteccion is not None else 'CUBO (ultima pos.)'
-        color_estado = (0, 255, 0) if deteccion is not None else (0, 200, 255)
-        cv2.rectangle(frame, (int(ccx - lado_cubo / 2), int(ccy - lado_cubo / 2)),
-                      (int(ccx + lado_cubo / 2), int(ccy + lado_cubo / 2)), (0, 255, 255), 1)
+            a = 0.35  
+            dibujar_cuadricula.caja_suave = (1 - a) * dibujar_cuadricula.caja_suave + a * quad_ordenado
+        estado = 'CUBO DETECTADO'
+        color_estado = (0, 255, 0)
     else:
-        # Fallback: rejilla fija clasica en el centro
-        ccx, ccy, celda = ancho / 2.0, alto / 2.0, 100.0
-        estado, color_estado = 'BUSCANDO CUBO...', (0, 0, 255)
+        if getattr(dibujar_cuadricula, 'caja_suave', None) is not None:
+            estado = 'CUBO (ultima pos.)'
+            color_estado = (0, 200, 255)
+        else:
+            ccx, ccy = ancho / 2.0, alto / 2.0
+            w_box = 180
+            tl = [ccx - w_box/2, ccy - w_box/2]
+            tr = [ccx + w_box/2, ccy - w_box/2]
+            br = [ccx + w_box/2, ccy + w_box/2]
+            bl = [ccx - w_box/2, ccy + w_box/2]
+            dibujar_cuadricula.caja_suave = np.array([tl, tr, br, bl], dtype=float)
+            estado = 'BUSCANDO CUBO...'
+            color_estado = (0, 0, 255)
 
+    # --- 5. Dibujar el contorno exterior del cubo suavizado ---
+    quad = dibujar_cuadricula.caja_suave
+    pts_int = quad.astype(np.int32)
+    cv2.polylines(frame, [pts_int], isClosed=True, color=(0, 255, 255), thickness=2)
     cv2.putText(frame, estado, (20, alto - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_estado, 2)
 
-    # --- 4. Rejilla 3x3 adaptada (mismo orden de lectura que siempre:
-    #        filas de arriba a abajo, columnas de derecha a izquierda,
-    #        coherente con el cv2.flip del bucle principal) ---
+    # --- 6. Generar la rejilla 3x3 rotada mediante interpolación ---
+    diag1 = np.linalg.norm(quad[0] - quad[2])
+    diag2 = np.linalg.norm(quad[1] - quad[3])
+    lado_cubo = (diag1 + diag2) / (2 * np.sqrt(2))
+    celda = lado_cubo / 3.0
+    
     _radio_muestreo = max(2, int(celda * 0.12))
-    lado_caja = int(celda * 0.6)
+    lado_caja = int(celda * 0.5)
+
     puntos_centrales = []
-    for fila in (-1, 0, 1):
-        for col in (1, 0, -1):
-            px = int(ccx + col * celda)
-            py = int(ccy + fila * celda)
+    
+    for ty in (1/6, 1/2, 5/6):
+        for tx in (5/6, 1/2, 1/6):
+            px, py = interpolar_punto(quad, tx, ty)
+            
             cv2.rectangle(frame, (px - lado_caja // 2, py - lado_caja // 2),
-                          (px + lado_caja // 2, py + lado_caja // 2), (0, 255, 0), 2)
+                          (px + lado_caja // 2, py + lado_caja // 2), (0, 255, 0), 1)
             cv2.circle(frame, (px, py), 3, (0, 0, 255), -1)
             puntos_centrales.append((px, py))
+
     return frame, puntos_centrales
 
+# ==========================================
+# 5. ORQUESTACIÓN Y HANDSHAKE CON ROS 2
+# ==========================================
 def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, modo="real"):
     if modo == "real":
         print("[*] Encendiendo cámara externa (Webcam)...")
@@ -154,31 +224,15 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
     print("[+] CAMARA OK. ESPERANDO SINCRONIZACIÓN CON ROS 2...")
     print("=======================================================\n")
 
-    # --- ORDEN DE ESCANEO (rutina optimizada: 3 viajes x 2 caras) ---
-    # Debe coincidir con Rutina_Escanear_Cubo en RAPID:
-    #   Viaje 1 (agarre 0, dedos F/B):  L (Rz=180), R (Rz=0)
-    #   Viaje 2 (agarre 90, dedos L/R): F (Rz=180), B (Rz=0)
-    #   Viaje 3 (tras volteo F->U):     D (Rz=180), U (Rz=0)
-    # Si en la calibracion dos caras de un par salen intercambiadas,
-    # permuta aqui sus letras (o los Rz en RAPID, pero no ambos).
     secuencia = ['L', 'R', 'F', 'B', 'D', 'U']
-
-    # --- CORRECCION DE ORIENTACION POR CARA (calibrable) ---
-    # Numero de rotaciones de 90 grados HORARIAS a aplicar a la rejilla
-    # 3x3 capturada de cada cara antes de guardarla. Con la presentacion
-    # nueva, el giro de muneca que selecciona la cara tambien fija como
-    # aparece rotada en la imagen; este mapa corrige ese residuo.
-    # CALIBRACION: escanea en virtual con un scramble conocido y ajusta
-    # cada valor (0,1,2,3) hasta que el mapa 2D coincida con el cubo.
     ROTACION_CARA = {'F': 0, 'B': 0, 'L': 0, 'R': 0, 'D': 0, 'U': 0}
 
     def rotar_cara(cara_str, veces):
-        """Rota una cara 3x3 (string de 9 stickers, orden lectura) 90 grados
-        horarios 'veces' veces."""
         s = cara_str
         for _ in range(veces % 4):
             s = s[6] + s[3] + s[0] + s[7] + s[4] + s[1] + s[8] + s[5] + s[2]
         return s
+        
     datos_caras = {}
     paso = 0
     esperando_bajada_robot = False
@@ -206,7 +260,8 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
 
         frame = cv2.flip(frame, 1)
 
-        frame_viz, puntos = dibujar_cuadricula(frame.copy())
+        # Usamos los rangos activos para el dibujado y adaptación de la rejilla
+        frame_viz, puntos = dibujar_cuadricula(frame.copy(), rangos_activos)
         cara_actual = secuencia[paso]
         t_ahora = time.monotonic()
 
@@ -223,11 +278,7 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
         forzar_foto = (tecla == ord(' '))
         robot_listo = fn_is_robot_listo()
 
-        # ---- LÓGICA DE ESTABILIDAD CORREGIDA ----
         if t_ahora - tiempo_ultima_foto < 1.0:
-            # Mantenemos el "1" solo mientras el robot NO haya confirmado la foto.
-            # En cuanto baja su flag (robot_listo = False) está esperando nuestro "0",
-            # así que se lo damos al instante: ahorra ~1s muerto por cara.
             if not robot_listo:
                 esperando_bajada_robot = False
                 comando_actual = 0
@@ -291,18 +342,12 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
         cv2.imshow("Escaner TFG", frame_viz)
         if tecla == ord('q'): break
         
-        # --- EL FRENO QUE EVITA QUE SE CUELGUE ROBOTSTUDIO ---
         time.sleep(0.05)
 
     if modo == "real": cap.release()
     cv2.destroyAllWindows()
 
     if paso == 6:
-        # --- CIERRE LIMPIO DEL HANDSHAKE FINAL ---
-        # Tras la 6a cara el RAPID queda en "WaitUntil EntradaRubik{3} = 0".
-        # Si salimos dejando el flag en 1, el robot se queda con el brazo
-        # extendido delante de la camara. Enviamos el 0 de forma sostenida
-        # para que deposite el cubo y pase a esperar la solucion.
         print("[*] Cerrando handshake final con el robot...")
         t_fin = time.monotonic() + 3.0
         while time.monotonic() < t_fin:
@@ -314,11 +359,9 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
         return string_final
     return ""
 
-COLORES_BGR = {
-    'U': (255, 255, 255), 'R': (0, 0, 255), 'F': (0, 255, 0),
-    'D': (0, 255, 255),   'L': (0, 165, 255), 'B': (255, 0, 0)
-}
-
+# ==========================================
+# 6. INTEGRIDAD Y MAPEO
+# ==========================================
 def validar_cubo(string_final):
     errores = [f"{c}: {string_final.count(c)}/9" for c in ['U', 'R', 'F', 'D', 'L', 'B'] if string_final.count(c) != 9]
     if errores:
@@ -349,3 +392,19 @@ def mostrar_mapa_2d(string_final):
     cv2.waitKey(3000) 
     cv2.destroyWindow("Mapa 2D - Cubo Detectado")
     return img
+
+if __name__ == "__main__":
+    def dummy_is_robot_listo():
+        return True
+
+    def dummy_set_comando_robot(comando):
+        print(f"Comando enviado al robot: {comando}")
+
+    def dummy_get_telemetria():
+        return 0.0
+
+    resultado = escanear_cubo(dummy_is_robot_listo, dummy_set_comando_robot, dummy_get_telemetria, modo="real")
+    if resultado:
+        print(f"Resultado del escaneo: {resultado}")
+        if validar_cubo(resultado):
+            mostrar_mapa_2d(resultado)
