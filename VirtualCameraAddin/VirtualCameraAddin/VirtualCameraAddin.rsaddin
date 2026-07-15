@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<RobotStudioAddIn xmlns="urn:abb-robotics-robotstudio-addin"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="urn:abb-robotics-robotstudio-addin file:///C:\Program%20Files%20(x86)\ABB\SDK\RobotStudio%202025%20SDK\RobotStudioAddin.xsd"
+                  autoLoad="true">
+	<ApplicationId>com.mycompany.VirtualCameraAddin</ApplicationId>
+	<AddInType>General</AddInType>
+	<Assembly>
+		<FileName>VirtualCameraAddin.dll</FileName>
+	</Assembly>
+	<MinimumHostVersion>25.1</MinimumHostVersion>
+	<Dependencies>Station</Dependencies>
+	<Platform>Any</Platform>
+</RobotStudioAddIn>
