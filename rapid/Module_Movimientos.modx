@@ -30,7 +30,7 @@ MODULE Module_Movimientos
     CONST robtarget pWhole_Grip:=[[0,0,8],[0,1,0,0],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget pU_RotNeg90:=[[0,0,18.7],[0,-0.707106781,-0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     !CONST robtarget pCamara := [[857.5,292.5,600],[0.5,-0.5,0.5,0.5],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    CONST robtarget pCamara:=[[873.67,268.73,458.82],[0.707002,0,0.707212,0],[0,0,1,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];    ! Procedimientos básicos de pinza
+    CONST robtarget pCamara:=[[895.75,308.85,718.20],[0,-0.707268,0,-0.706945],[0,1,-2,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];    ! Procedimientos básicos de pinza
 
     ! Procedimientos básicos de pinza
     PROC Cerrar_Pinza()

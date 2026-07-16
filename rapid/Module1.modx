@@ -2,8 +2,8 @@ MODULE Module1
     VAR egmident egmID1;
 
     ! Matrices de 100 posiciones con NOMBRES NUEVOS para forzar memoria limpia
-    PERS dnum EntradaRubik{40};
-    PERS dnum SalidaRubik{40} := [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];      
+    PERS dnum EntradaRubik{40} := [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    PERS dnum SalidaRubik{40} := [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];      
     ! ==========================================================
     ! RUTINA TEMPORAL DE TEST PING-PONG EGM
     ! ==========================================================
@@ -38,7 +38,7 @@ MODULE Module1
     ! -----------------------------------------------------------------
     ! MAIN DE PRUEBAS (Física y Lógica local sin Python)
     ! -----------------------------------------------------------------
-    PROC main()
+    PROC main_Pruebas()
         ! --- Dar libertad a las articulaciones ---
         !ConfL \Off;
         !ConfJ \Off;
@@ -51,7 +51,7 @@ MODULE Module1
         ! Usamos las nuevas constantes de velocidad y zona
         MoveJ pHome, vGiro, zLibre, PincGripper \WObj:=wobj_Cubo;
         
-        !Rutina_Escanear_Cubo;
+        Rutina_Escanear_Cubo;
         
         ! Descomenta SOLO la cara que quieras probar en este momento
         
@@ -93,7 +93,7 @@ MODULE Module1
     ! MAIN DE PRODUCCIÓN (Conexión Python - EGM)
     ! -----------------------------------------------------------------
     
-   PROC main_bueno()
+   PROC main()
         VAR num cmd;
         VAR num id_recibido;
         VAR num id_procesado := 0;

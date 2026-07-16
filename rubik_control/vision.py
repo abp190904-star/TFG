@@ -28,6 +28,18 @@ RANGOS_HSV_VIRTUAL = {
     'rojo_2':   ([165, 140, 80],   [179, 255, 255], 'R')  
 }
 
+# ==========================================
+# POSICIÓN FIJA DE LA REJILLA (coords en frame 640x480 YA VOLTEADO)
+# Ajusta estos 4 puntos: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
+# ==========================================
+CUADRO_FIJO = np.array([
+    [192, 110],   # TL
+    [380, 110],   # TR
+    [380, 300],   # BR
+    [192, 300],   # BL
+], dtype=float)
+
+
 COLORES_BGR = {
     'U': (255, 255, 255), 'R': (0, 0, 255), 'F': (0, 255, 0),
     'D': (0, 255, 255),   'L': (0, 165, 255), 'B': (255, 0, 0)
@@ -94,105 +106,36 @@ def interpolar_punto(quad, tx, ty):
 # ==========================================
 # 4. MOTOR DE DETECCIÓN Y TRACKING
 # ==========================================
-def dibujar_cuadricula(frame, rangos_activos):
+def dibujar_cuadricula(frame, rangos_activos=None):
     """
-    DETECCIÓN ROBUSTA EN MUNDO REAL: Localiza la cara del cubo fusionando las 
-    pegatinas de colores calibrados (omitiendo el blanco para evitar reflejos) 
-    y proyecta una rejilla 3x3 autoadaptativa y autorrotativa.
+    REJILLA FIJA: proyecta la cuadrícula 3x3 sobre CUADRO_FIJO,
+    sin detección ni tracking. rangos_activos se ignora (se mantiene
+    el parámetro para no romper las llamadas existentes).
     """
     global _radio_muestreo
     alto, ancho, _ = frame.shape
 
-    # --- 1. Crear máscara uniendo todos los colores saturados (menos blanco) ---
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
-    
-    for color, (bajo, alto_val, _) in rangos_activos.items():
-        if color == 'blanco':
-            continue
-        bajo_arr = np.array(bajo)
-        alto_arr = np.array(alto_val)
-        mask_temp = cv2.inRange(hsv, bajo_arr, alto_arr)
-        mask = cv2.bitwise_or(mask, mask_temp)
+    quad = CUADRO_FIJO
 
-    # --- 2. Operaciones morfológicas para fusionar stickers en un bloque ---
-    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
-    mask_cerrada = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
-    
-    kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    mask_limpia = cv2.morphologyEx(mask_cerrada, cv2.MORPH_OPEN, kernel_open)
-
-    # --- 3. Encontrar el contorno que mejor encaje como cara del cubo ---
-    deteccion = None
-    contornos, _ = cv2.findContours(mask_limpia, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    if contornos:
-        contornos_validos = []
-        for c in contornos:
-            area = cv2.contourArea(c)
-            if area < 4000:
-                continue
-            
-            rect = cv2.minAreaRect(c)
-            box = cv2.boxPoints(rect)
-            box = np.array(box, dtype=np.int32)
-            
-            (cx, cy), (w, h), angle = rect
-            if h == 0: continue
-            ratio = w / float(h)
-            if 0.65 < ratio < 1.5:
-                contornos_validos.append((area, box))
-        
-        if contornos_validos:
-            contornos_validos.sort(key=lambda x: x[0], reverse=True)
-            deteccion = contornos_validos[0][1]
-
-    # --- 4. Filtro de suavizado temporal (EMA) para evitar saltos ---
-    if deteccion is not None:
-        quad_ordenado = ordenar_puntos(deteccion)
-        if getattr(dibujar_cuadricula, 'caja_suave', None) is None:
-            dibujar_cuadricula.caja_suave = quad_ordenado.astype(float)
-        else:
-            a = 0.35  
-            dibujar_cuadricula.caja_suave = (1 - a) * dibujar_cuadricula.caja_suave + a * quad_ordenado
-        estado = 'CUBO DETECTADO'
-        color_estado = (0, 255, 0)
-    else:
-        if getattr(dibujar_cuadricula, 'caja_suave', None) is not None:
-            estado = 'CUBO (ultima pos.)'
-            color_estado = (0, 200, 255)
-        else:
-            ccx, ccy = ancho / 2.0, alto / 2.0
-            w_box = 180
-            tl = [ccx - w_box/2, ccy - w_box/2]
-            tr = [ccx + w_box/2, ccy - w_box/2]
-            br = [ccx + w_box/2, ccy + w_box/2]
-            bl = [ccx - w_box/2, ccy + w_box/2]
-            dibujar_cuadricula.caja_suave = np.array([tl, tr, br, bl], dtype=float)
-            estado = 'BUSCANDO CUBO...'
-            color_estado = (0, 0, 255)
-
-    # --- 5. Dibujar el contorno exterior del cubo suavizado ---
-    quad = dibujar_cuadricula.caja_suave
+    # Contorno exterior
     pts_int = quad.astype(np.int32)
     cv2.polylines(frame, [pts_int], isClosed=True, color=(0, 255, 255), thickness=2)
-    cv2.putText(frame, estado, (20, alto - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_estado, 2)
+    cv2.putText(frame, 'REJILLA FIJA', (20, alto - 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-    # --- 6. Generar la rejilla 3x3 rotada mediante interpolación ---
+    # Tamaño de celda y radio de muestreo (igual que antes)
     diag1 = np.linalg.norm(quad[0] - quad[2])
     diag2 = np.linalg.norm(quad[1] - quad[3])
     lado_cubo = (diag1 + diag2) / (2 * np.sqrt(2))
     celda = lado_cubo / 3.0
-    
+
     _radio_muestreo = max(2, int(celda * 0.12))
     lado_caja = int(celda * 0.5)
 
     puntos_centrales = []
-    
     for ty in (1/6, 1/2, 5/6):
         for tx in (5/6, 1/2, 1/6):
             px, py = interpolar_punto(quad, tx, ty)
-            
             cv2.rectangle(frame, (px - lado_caja // 2, py - lado_caja // 2),
                           (px + lado_caja // 2, py + lado_caja // 2), (0, 255, 0), 1)
             cv2.circle(frame, (px, py), 3, (0, 0, 255), -1)
