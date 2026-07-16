@@ -17,29 +17,32 @@ MODULE Module_Movimientos
     CONST num dAprox := 50;
     CONST num dSegura := 130;
     
-    CONST num offset := 18;
-    CONST num offset_z := 10;  
-
-    TASK PERS wobjdata wobj_Cubo:=[FALSE,TRUE,"",[[57.5,527.5,291.5],[1,0,0,0]],[[0,0,0],[1,0,0,0]]];
+    CONST num offset := 21.5;
+    CONST num offset_z := 21.5;  
+    
+    TASK PERS wobjdata wobj_Cubo:=[FALSE,TRUE,"",[[573.75,0,292.92],[0.707107,0,0,-0.707107]],[[0,0,0],[1,0,0,0]]];
     PERS tooldata PincGripper:=[TRUE,[[0,0,150],[0,0,0,1]],[1,[0,0,40],[1,0,0,0],0,0,0]];
     
     CONST pose pose0 := [[0,0,0],[1,0,0,0]];
-    CONST robtarget pHome:=[[515.19,-527.06,164.90],[5.39197E-05,0.701431,-0.712738,-3.65967E-05],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    CONST robtarget pU_Grip:=[[515.21,-527.06,24],[6.45796E-05,0.701433,-0.712736,-4.60777E-05],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pHome:=[[0,0,172],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pU_Grip:=[[0,0,21.5],[0,1,0,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget pU_Rot90:=[[0,0,18.7],[0,0.707106781,0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    CONST robtarget pWhole_Grip:=[[515.22,-527.07,9.92],[4.82484E-05,0.701432,-0.712736,-2.99622E-05],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pWhole_Grip:=[[0,0,8],[0,1,0,0],[0,-1,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget pU_RotNeg90:=[[0,0,18.7],[0,-0.707106781,-0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    CONST robtarget pCamara:=[[873.67,268.73,458.82],[0.707002,-8.46274E-05,0.707212,5.31954E-05],[0,0,1,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];    ! Procedimientos básicos de pinza
+    !CONST robtarget pCamara := [[857.5,292.5,600],[0.5,-0.5,0.5,0.5],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget pCamara:=[[873.67,268.73,458.82],[0.707002,0,0.707212,0],[0,0,1,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];    ! Procedimientos básicos de pinza
+
+    ! Procedimientos básicos de pinza
     PROC Cerrar_Pinza()
-!        SetDO do_Gripper_Close, 1;
-!        Reset do_Gripper_Open;
+        !SetDO do_Gripper_Close, 1;
+        !Reset do_Gripper_Open;
         Set Local_IO_0_DO1;
         WaitTime 0.5;
     ENDPROC
 
     PROC Abrir_Pinza()
-!        SetDO do_Gripper_Open, 1;
-!        Reset do_Gripper_Close;
+        !SetDO do_Gripper_Open, 1;
+        !Reset do_Gripper_Close;
         Reset Local_IO_0_DO1;
         WaitTime 0.5;
     ENDPROC
@@ -177,32 +180,31 @@ MODULE Module_Movimientos
 
     PROC Escanear_Par(num rz_agarre, num rz_cara1)
         ! 1. Recoger con la muneca a rz_agarre
-        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
-        MoveL RelTool(pU_Grip, 0, 0, -dAprox \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
-        MoveL RelTool(pU_Grip, 0, 0, 0 \Rz:=rz_agarre), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pWhole_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pWhole_Grip, 0, 0, -dAprox \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pWhole_Grip, 0, 0, 0 \Rz:=rz_agarre), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Cerrar_Pinza;
-        MoveL RelTool(pU_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveL RelTool(pWhole_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
 
         ! === ZONA DE VUELO LIBRE ===
         ConfJ \Off;
         SingArea \Wrist;
 
         ! 2. Presentar, girar y deshacer (todo en vuelo libre)
-        ! CORRECCIÓN: Quitamos el '+ rz_agarre'. 
-        ! Queremos que la pinza adopte la MISMA postura física siempre.
-        Presentar_Y_Fotografiar rz_cara1;
+        Presentar_Y_Fotografiar (rz_cara1 + rz_agarre);
         Girar_Muneca_Y_Fotografiar;
         Deshacer_Giro_Muneca;
 
-        ! 3. Volver a activar rigidez geométrica para el descenso
+       ! 3. Volver a activar rigidez geométrica para el descenso
         SingArea \Off;
         ConfJ \On;
         
         ! 4. Descenso y depositar
-        MoveJ RelTool(pU_Grip, 0, 0, -dAprox \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
-        MoveJ RelTool(pU_Grip, 0, 0, 0 \Rz:=rz_agarre), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        ! CAMBIADO: MoveL a MoveJ para evitar el error 50436
+        MoveJ RelTool(pWhole_Grip, 0, 0, -dAprox \Rz:=rz_agarre), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pWhole_Grip, 0, 0, 0 \Rz:=rz_agarre), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
-        MoveJ RelTool(pU_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pWhole_Grip, 0, 0, -dSegura \Rz:=rz_agarre), vAprox, fine, PincGripper \WObj:=wobj_Cubo;
     ENDPROC
 
     ! ==========================================================
@@ -245,7 +247,7 @@ MODULE Module_Movimientos
         TPWrite "Escaneo terminado. Esperando resolucion de Kociemba...";
     ENDPROC
     
-    ! ==========================================================
+! ==========================================================
     ! RUTINAS DE REORIENTACIÓN (Método 45º - ENTRADA VERTICAL)
     ! ==========================================================
 
@@ -269,11 +271,11 @@ MODULE Module_Movimientos
         MoveJ Offs(pU_Grip, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;        
         
-        MoveL Offs(pGripNeg45, 0, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, -4, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
-        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
-        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, -4, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, -4, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
     ENDPROC
 
     PROC Mov_Devolver_U_a_R()
@@ -293,11 +295,11 @@ MODULE Module_Movimientos
         MoveJ Offs(pU_Grip, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveJ Offs(pGrip45, 0, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, 4, 0, -offset_z+4), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
-        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
-        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, 4, -4, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, 4, -4, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
     ENDPROC
 
     ! ==========================================================
@@ -341,14 +343,14 @@ MODULE Module_Movimientos
         Cerrar_Pinza;
         
         MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
-        MoveJ Offs(pU_Grip, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
-        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pU_Grip, -4, -1, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, -4, -1, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveJ Offs(pGrip45, 0, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, -4, -1, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
-        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
-        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, -4, -1, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, -4, -1, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
     ENDPROC
     
     ! ==========================================================
@@ -373,11 +375,17 @@ MODULE Module_Movimientos
         MoveJ Offs(pBaseF, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;        
         
-        MoveL Offs(pGripNeg45, 0, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, -4, 4, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
-        MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
-        MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        ConfJ\Off;
+        ConfL\Off;
+        
+        MoveL Offs(pGripNeg45, -4, 4, dSegura), vAprox, zAprox, PincGripper\WObj:=wobj_Cubo;
+        MoveJ Offs(pGripNeg45, -4, 4, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        
+        ConfJ\on;
+        ConfL\on;
     ENDPROC
 
     PROC Mov_Devolver_U_a_F()
@@ -392,18 +400,20 @@ MODULE Module_Movimientos
         MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
         MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        !MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, -4, 0, 0), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+
         Cerrar_Pinza;
         
         MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pBaseF, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveJ Offs(pGrip45, 0, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, 0, -4, -offset_z+2), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
-        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
-        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, 0, -4, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, 0, -4, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
     ENDPROC
 
     ! ==========================================================
@@ -421,7 +431,9 @@ MODULE Module_Movimientos
         MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
         MoveL Offs(pGrip45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        !MoveL pGrip45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;  
+        MoveL Offs(pGrip45, -2, 0, 0), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+
         Cerrar_Pinza;
         
         MoveL Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
@@ -447,7 +459,9 @@ MODULE Module_Movimientos
         MoveJ Offs(pGripNeg45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
         MoveL Offs(pGripNeg45, 0, 0, dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        !MoveL pGripNeg45, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGripNeg45, 4, 0, 0), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+
         Cerrar_Pinza;
         
         MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
@@ -471,13 +485,16 @@ MODULE Module_Movimientos
 
         ! El agarre lateral se define rotando -90 en Y
         pSideGrip := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-90);
-
+        
         ! 1. Aproximación pura sobre el eje Z de la pinza (que ahora es horizontal)
-        MoveJ RelTool(pSideGrip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pSideGrip, -120, 0, -120), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pSideGrip, 0, 0, -80), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        !MoveJ RelTool(pSideGrip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
         MoveL RelTool(pSideGrip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
         ! 2. Agarre horizontal
-        MoveL pSideGrip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        MoveL Offs(pSideGrip, +4, 0, +4), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        !MoveL pSideGrip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
         Cerrar_Pinza;
         
         ! 3. Subida vertical recta respecto al plano de la mesa (WObj)
@@ -493,7 +510,7 @@ MODULE Module_Movimientos
         
         ! 5. Bajada vertical pura
         p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
-        MoveL Offs(p_actual, 0, 0, -dSegura), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(p_actual, 2, -2, -dSegura+3), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
         ! 6. Salida vertical pura hacia arriba
@@ -511,10 +528,14 @@ MODULE Module_Movimientos
 
         pSideGrip := RelTool(pWhole_Grip, 0, 0, 0 \Ry:=-90);
 
-        MoveJ RelTool(pSideGrip, 0, 0, -dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pSideGrip, -120, 0, -120), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveJ RelTool(pSideGrip, 0, 0, -80), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveL RelTool(pSideGrip, 0, 0, -dAprox), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveL pSideGrip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;        
+        !MoveL pSideGrip, vAgarre, fine, PincGripper \WObj:=wobj_Cubo;    
+        
+        MoveL Offs(pSideGrip, +4, 0, +4), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+
         Cerrar_Pinza;
         
         p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
@@ -528,7 +549,7 @@ MODULE Module_Movimientos
         WaitRob \InPos;
         
         p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);
-        MoveL Offs(p_actual, 0, 0, -dSegura), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(p_actual, 2, -2, -dSegura+3), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
         p_actual := CRobT(\Tool:=PincGripper \WObj:=wobj_Cubo);

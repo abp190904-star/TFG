@@ -55,29 +55,34 @@ MODULE Module1
         
         ! Descomenta SOLO la cara que quieras probar en este momento
         
+        
         TPWrite "Probando F (Front)...";
         Girar_F;
         WaitTime 2.0; ! Pausa para observar
         
-        !TPWrite "Probando B (Back)...";
-        !Girar_B;
-        !WaitTime 2.0;
+        TPWrite "Probando B (Back)...";
+        Girar_B;
+        WaitTime 2.0;
         
-        !TPWrite "Probando D (Down - Doble F)...";
-        !Girar_D;
-        !WaitTime 2.0;
+        TPWrite "Probando D (Down - Doble F)...";
+        Girar_D;
+        WaitTime 2.0;
         
-        !TPWrite "Probando R (Down - Doble F)...";
-        !Girar_R;
-        !WaitTime 2.0;
+        TPWrite "Probando R (Down - Doble F)...";
+        Girar_R;
+        WaitTime 2.0;
         
-        !TPWrite "Probando F Doble (F2)...";
-        !Girar_F_Doble;    ! <--- Simplemente pones el nombre de la rutina aquí
-        !WaitTime 2.0;     ! Pausa para observar que lo ha hecho bien
+        TPWrite "Probando L (Down - Doble F)...";
+        Girar_L;
+        WaitTime 2.0;
         
-        !TPWrite "Probando R Doble (R2)...";
-        !Girar_R_Doble;   ! <--- Si quieres probar otra, la pones y la descomentas
-        !WaitTime 2.0;
+        TPWrite "Probando F Doble (F2)...";
+        Girar_F_Doble;    ! <--- Simplemente pones el nombre de la rutina aquí
+        WaitTime 2.0;     ! Pausa para observar que lo ha hecho bien
+        
+        TPWrite "Probando R Doble (R2)...";
+        Girar_R_Doble;   ! <--- Si quieres probar otra, la pones y la descomentas
+        WaitTime 2.0;
         
         TPWrite "=== TEST FINALIZADO ===";
         MoveJ pHome, vGiro, zLibre, PincGripper \WObj:=wobj_Cubo;
