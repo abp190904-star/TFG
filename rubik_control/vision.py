@@ -10,10 +10,10 @@ import subprocess
 # ==========================================
 RANGOS_HSV_REAL = {
     'blanco':   ([0, 0, 140],      [179, 65, 255],  'U'),
-    'amarillo': ([29, 100, 100],   [41, 255, 255],  'D'),
-    'verde':    ([53, 100, 100],   [87, 255, 250],  'F'),
+    'amarillo': ([29, 100, 100],   [44, 255, 255],  'D'),
+    'verde':    ([46, 100, 100],   [87, 255, 255],  'F'),
     'azul':     ([91, 130, 113],   [127, 255, 205], 'B'),
-    'naranja':  ([10, 123, 125],   [23, 255, 255],  'L'),
+    'naranja':  ([10, 123, 125],   [25, 255, 255],  'L'),
     'rojo_1':   ([0, 117, 119],    [11, 255, 255],  'R'), 
     'rojo_2':   ([165, 117, 119],  [179, 255, 255], 'R')  
 }
@@ -33,10 +33,10 @@ RANGOS_HSV_VIRTUAL = {
 # Ajusta estos 4 puntos: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
 # ==========================================
 CUADRO_FIJO = np.array([
-    [192, 110],   # TL
-    [380, 110],   # TR
-    [380, 300],   # BR
-    [192, 300],   # BL
+    [260, 110],   # TL
+    [448, 110],   # TR
+    [448, 300],   # BR
+    [260, 300],   # BL
 ], dtype=float)
 
 
@@ -134,7 +134,7 @@ def dibujar_cuadricula(frame, rangos_activos=None):
 
     puntos_centrales = []
     for ty in (1/6, 1/2, 5/6):
-        for tx in (5/6, 1/2, 1/6):
+        for tx in (1/6, 1/2, 5/6):   # columnas de IZQUIERDA a DERECHA
             px, py = interpolar_punto(quad, tx, ty)
             cv2.rectangle(frame, (px - lado_caja // 2, py - lado_caja // 2),
                           (px + lado_caja // 2, py + lado_caja // 2), (0, 255, 0), 1)
@@ -167,7 +167,7 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
     print("[+] CAMARA OK. ESPERANDO SINCRONIZACIÓN CON ROS 2...")
     print("=======================================================\n")
 
-    secuencia = ['L', 'R', 'F', 'B', 'D', 'U']
+    secuencia = ['R', 'L', 'F', 'B', 'D', 'U']
     ROTACION_CARA = {'F': 0, 'B': 0, 'L': 0, 'R': 0, 'D': 0, 'U': 0}
 
     def rotar_cara(cara_str, veces):
@@ -200,9 +200,7 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
                 if frame is None: continue
             except Exception:
                 continue
-
-        frame = cv2.flip(frame, 1)
-
+        
         # Usamos los rangos activos para el dibujado y adaptación de la rejilla
         frame_viz, puntos = dibujar_cuadricula(frame.copy(), rangos_activos)
         cara_actual = secuencia[paso]
@@ -297,7 +295,7 @@ def escanear_cubo(fn_is_robot_listo, fn_set_comando_robot, fn_get_telemetria, mo
             fn_set_comando_robot(0)
             time.sleep(0.05)
 
-        string_final = datos_caras['U'] + datos_caras['R'] + datos_caras['F'] + datos_caras['D'] + datos_caras['L'] + datos_caras['B']
+        string_final = datos_caras['U'][::-1] + datos_caras['R'] + datos_caras['F'] + datos_caras['D'] + datos_caras['L'] + datos_caras['B']
         print(f"\n[*] STRING FINAL KOCIEMBA: {string_final}")
         return string_final
     return ""

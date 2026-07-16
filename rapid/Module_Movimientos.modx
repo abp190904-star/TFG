@@ -8,7 +8,7 @@ MODULE Module_Movimientos
     ! --- CONSTANTES DE VELOCIDAD Y ZONA ---
     CONST speeddata vAprox := v500;
     CONST speeddata vAgarre := v100;
-    CONST speeddata vGiro := v200;
+    CONST speeddata vGiro := v400;
     CONST speeddata vRapida := v1000;
     CONST zonedata zAprox := z5;
     CONST zonedata zLibre := z30;
@@ -191,7 +191,7 @@ MODULE Module_Movimientos
         SingArea \Wrist;
 
         ! 2. Presentar, girar y deshacer (todo en vuelo libre)
-        Presentar_Y_Fotografiar (rz_cara1 + rz_agarre);
+        Presentar_Y_Fotografiar rz_cara1;
         Girar_Muneca_Y_Fotografiar;
         Deshacer_Giro_Muneca;
 
@@ -466,13 +466,13 @@ MODULE Module_Movimientos
         
         MoveL Offs(pGripNeg45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         MoveJ Offs(pBaseB, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
-        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, -2, 0, dSegura), vAprox, zAprox, PincGripper \WObj:=wobj_Cubo;
         
-        MoveJ Offs(pGrip45, 0, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
+        MoveJ Offs(pGrip45, -2, 0, -offset_z), vAgarre, fine, PincGripper \WObj:=wobj_Cubo;
         Abrir_Pinza;
         
-        MoveL Offs(pGrip45, 0, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
-        MoveJ Offs(pGrip45, 0, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
+        MoveL Offs(pGrip45, -2, 0, dAprox), vGiro, zAprox, PincGripper \WObj:=wobj_Cubo;    
+        MoveJ Offs(pGrip45, -2, 0, dSegura), vAprox, zLibre, PincGripper \WObj:=wobj_Cubo;
     ENDPROC
     
     ! ==========================================================
