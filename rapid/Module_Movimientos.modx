@@ -6,9 +6,9 @@ MODULE Module_Movimientos
     LOCAL CONST num angRef := 180;   ! angulo con el que se aprende la postura
 
     ! --- CONSTANTES DE VELOCIDAD Y ZONA ---
-    CONST speeddata vAprox := v500;
+    CONST speeddata vAprox := v600;
     CONST speeddata vAgarre := v100;
-    CONST speeddata vGiro := v400;
+    CONST speeddata vGiro := v600;
     CONST speeddata vRapida := v1000;
     CONST zonedata zAprox := z5;
     CONST zonedata zLibre := z30;
